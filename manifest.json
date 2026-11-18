@@ -1,7 +1,14 @@
 {
   "name": "Defuse Link",
   "description": "Sends the picture of an ephemeral message to your local defuse bot (Termux) and shows the answer.",
-  "authors": [{ "name": "you" }],
+  "authors": [
+    {
+      "name": "you"
+    }
+  ],
   "main": "index.js",
-  "vendetta": { "icon": "ic_message_edit" }
+  "vendetta": {
+    "icon": "ic_message_edit"
+  },
+  "hash": "9b97775bd0451ed30c77"
 }

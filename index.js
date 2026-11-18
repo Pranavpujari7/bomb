@@ -1,6 +1,11 @@
-// Defuse Link - Kettu/Vendetta plugin (plain JS, no build step).
-// Needs the bot (d36.py) running on THIS phone: it listens on 127.0.0.1:8765.
-({
+(() => {
+  // Defuse Link - Kettu/Vendetta plugin (plain JS, no build step).
+  // Needs the bot (d42.py or newer) running on THIS phone: it listens on 127.0.0.1:8765.
+  // NOTE for editors: Kettu evaluates the file as  vendetta=>{return <file>}  so the file must START with the expression (no comment
+  // lines before it: "return" + newline would return undefined), and it must not rely on `this`. After ANY change of this file
+  // change "hash" in manifest.json too, otherwise Kettu thinks nothing changed and does not download it again.
+  const state = { unpatches: [] };
+  return {
   onLoad() {
     // ---------- settings ----------
     const URL_BASE = "http://127.0.0.1:8765";
@@ -14,7 +19,7 @@
     const { React, FluxDispatcher } = vendetta.metro.common;
     const { showToast } = vendetta.ui.toasts;
     const { showConfirmationAlert } = vendetta.ui.alerts;
-    this.unpatches = [];
+    state.unpatches = [];
     const seen = new Set();
     let busy = false;
 
@@ -58,7 +63,7 @@
         showToast("Bot not reachable - is it running in Termux?");
       }
     };
-    this.saveManual = saveManual;
+    state.saveManual = saveManual;
 
     const solve = async (url) => {
       if (busy) return;
@@ -84,7 +89,7 @@
         busy = false;
       }
     };
-    this.solve = solve;
+    state.solve = solve;
 
     // ---------- AUTO: new ephemeral message with a picture ----------
     if (AUTO) {
@@ -107,7 +112,7 @@
       };
       FluxDispatcher.subscribe("MESSAGE_CREATE", onMsg);
       FluxDispatcher.subscribe("MESSAGE_UPDATE", onMsg);
-      this.unpatches.push(() => {
+      state.unpatches.push(() => {
         FluxDispatcher.unsubscribe("MESSAGE_CREATE", onMsg);
         FluxDispatcher.unsubscribe("MESSAGE_UPDATE", onMsg);
       });
@@ -119,7 +124,7 @@
         const LazyActionSheet = findByProps("openLazy", "hideActionSheet");
         const Rows = findByProps("ActionSheetRow");
         const { findInReactTree } = vendetta.utils;
-        this.unpatches.push(
+        state.unpatches.push(
           before("openLazy", LazyActionSheet, ([component, key, msg]) => {
             const message = msg && msg.message;
             if (key !== "MessageLongPressActionSheet" || !message) return;
@@ -160,8 +165,9 @@
   },
 
   onUnload() {
-    for (const u of this.unpatches || []) {
+    for (const u of state.unpatches || []) {
       try { u(); } catch (e) {}
     }
   },
-})
+  };
+})()

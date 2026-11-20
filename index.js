@@ -64,19 +64,31 @@
       }
       return parts.filter(Boolean).join("\n");
     };
+    const post = async (path, body) => {
+      let r;
+      try {
+        r = await fetch(URL_BASE + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      } catch (e) {
+        throw new Error("NET " + ((e && e.message) || e));
+      }
+      try {
+        return await r.json();
+      } catch (e) {
+        throw new Error("the bot answered (" + r.status + ") but not with JSON - is it an old bot file?");
+      }
+    };
+    const fail = (e) => {
+      const m = String((e && e.message) || e);
+      showToast(m.indexOf("NET ") === 0 ? "Can't reach the bot at 127.0.0.1:8765 (" + m.slice(4) + ") - is it running in Termux?" : "Bot problem: " + m);
+    };
     const saveManual = async (text, urls, silentIfUnknown, channelId) => {
       try {
         const me = findByStoreName("UserStore").getCurrentUser();
-        const r = await fetch(URL_BASE + "/manual", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, urls: urls || [], user: me.id }),
-        });
-        const j = await r.json();
+        const j = await post("/manual", { text, urls: urls || [], user: me.id });
         if (!j.found && silentIfUnknown) return;
         show(j.found ? "Manual saved" : "Not saved", j.text, channelId);
       } catch (e) {
-        showToast("Bot not reachable - is it running in Termux?");
+        fail(e);
       }
     };
     state.saveManual = saveManual;
@@ -99,16 +111,11 @@
           if (!url) continue;
           items.push({ id: m.id, text: textOf(m), url });
         }
-        const r = await fetch(URL_BASE + "/solveall", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user: me.id, items }),
-        });
-        const j = await r.json();
+        const j = await post("/solveall", { user: me.id, items });
         if (j.copy && j.copied === false) copyText(j.copy);
         show("Answers", j.text, ch);
       } catch (e) {
-        showToast("Bot not reachable - is it running in Termux?");
+        fail(e);
       } finally {
         busy = false;
       }
@@ -132,16 +139,11 @@
       showToast("Solving...");
       try {
         const me = findByStoreName("UserStore").getCurrentUser();
-        const r = await fetch(URL_BASE + "/solve", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, user: me.id }),
-        });
-        const j = await r.json();
+        const j = await post("/solve", { url, user: me.id });
         if (j.copy && j.copied === false) copyText(j.copy);
         show("Answer", j.text, channelId);
       } catch (e) {
-        showToast("Bot not reachable - is it running in Termux?");
+        fail(e);
       } finally {
         busy = false;
       }

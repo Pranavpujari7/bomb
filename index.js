@@ -13,8 +13,15 @@
     const { React, FluxDispatcher } = vendetta.metro.common;
     const { showToast } = vendetta.ui.toasts;
     const { showConfirmationAlert } = vendetta.ui.alerts;
+    // only the NEWEST loaded copy of this plugin acts (two installed copies = every answer appeared 2-3 times)
+    const G = typeof globalThis !== "undefined" ? globalThis : window;
+    const token = {};
+    G.__defuseToken = token;
+    const alive = () => G.__defuseToken === token;
+    state.token = token;
     state.unpatches = [];
-    const seen = new Set();
+    G.__defuseSeen = G.__defuseSeen || new Set();
+    const seen = G.__defuseSeen;
     let busy = false;
     const imageOf = (m) => {
       if (!m) return null;
@@ -142,6 +149,7 @@
     state.solve = solve;
     if (AUTO) {
       const onMsg = (ev) => {
+        if (!alive()) return;
         const m = ev && ev.message;
         if (!m || !(Number(m.flags || 0) & 64)) return;
         if (String(m.content || "").charCodeAt(0) === 0x200b) return;
@@ -175,7 +183,7 @@
         state.unpatches.push(
           before("openLazy", LazyActionSheet, ([component, key, msg]) => {
             const message = msg && msg.message;
-            if (key !== "MessageLongPressActionSheet" || !message) return;
+            if (!alive() || key !== "MessageLongPressActionSheet" || !message) return;
             const url = imageOf(message);
             const urls = imagesOf(message);
             const txt = textOf(message);
@@ -186,7 +194,7 @@
                 React.useEffect(() => () => { un(); }, []);
                 const rows = findInReactTree(res, (x) => Array.isArray(x) && x[0] && x[0].props && x[0].props.onPress);
                 if (!rows) return;
-                if (rows.some((r) => r && r.key && String(r.key).indexOf("defuse-") === 0)) return;
+                if (!alive() || rows.some((r) => r && r.key && String(r.key).indexOf("defuse-") === 0)) return;
                 const row = (k, label, fn) =>
                   React.createElement(Rows.ActionSheetRow, {
                     key: "defuse-" + k,
@@ -208,10 +216,11 @@
     }
   },
   onUnload() {
+    const G = typeof globalThis !== "undefined" ? globalThis : window;
+    if (G.__defuseToken === state.token) G.__defuseToken = null;
     for (const u of state.unpatches || []) {
       try { u(); } catch (e) {}
     }
   },
   };
 })()
-          

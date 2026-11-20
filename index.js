@@ -133,13 +133,13 @@
       }
       return out;
     };
-    const solve = async (url, channelId) => {
+    const solve = async (url, channelId, text) => {
       if (busy) return;
       busy = true;
       showToast("Solving...");
       try {
         const me = findByStoreName("UserStore").getCurrentUser();
-        const j = await post("/solve", { url, user: me.id });
+        const j = await post("/solve", { url, text: text || "", user: me.id });
         if (j.copy && j.copied === false) copyText(j.copy);
         show("Answer", j.text, channelId);
       } catch (e) {
@@ -168,7 +168,7 @@
         const key = m.id + "|" + String(url).split("?")[0];
         if (seen.has(key)) return;
         seen.add(key);
-        solve(url, chId);
+        solve(url, chId, textOf(m));
       };
       FluxDispatcher.subscribe("MESSAGE_CREATE", onMsg);
       FluxDispatcher.subscribe("MESSAGE_UPDATE", onMsg);
@@ -204,7 +204,7 @@
                     onPress: () => { LazyActionSheet.hideActionSheet(); fn(); },
                   });
                 const mine = [];
-                if (url) mine.push(row("solve", "Solve module", () => solve(url, chId)));
+                if (url) mine.push(row("solve", "Solve module", () => solve(url, chId, txt)));
                 mine.push(row("manual", "Save manual", () => saveManual(txt, urls, false, chId)));
                 mine.push(row("all", "Solve all", () => solveAll(message, chId)));
                 rows.unshift(...mine);

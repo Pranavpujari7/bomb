@@ -59,7 +59,7 @@
     const textOf = (m) => {
       const parts = [m.content || ""];
       for (const e of m.embeds || []) {
-        parts.push(e.rawTitle || e.title || "", e.rawDescription || e.description || "");
+        parts.push(e.rawTitle || e.title || "", e.rawDescription || e.description || "", (e.footer && (e.footer.text || e.footer.rawText)) || "");
         for (const f of e.fields || []) parts.push((f.rawName || f.name || "") + "\n" + (f.rawValue || f.value || ""));
       }
       return parts.filter(Boolean).join("\n");

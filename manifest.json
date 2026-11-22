@@ -1,14 +1,7 @@
 {
   "name": "Defuse Link",
-  "description": "Sends the picture of an ephemeral message to your local defuse bot (Termux) and shows the answer.",
-  "authors": [
-    {
-      "name": "you"
-    }
-  ],
+  "description": "Sends bomb module pictures and manuals to the local defuser helper bot (127.0.0.1:8765) and shows the answers.",
+  "authors": [{ "name": "Pranavpujari7" }],
   "main": "index.js",
-  "vendetta": {
-    "icon": "ic_message_edit"
-  },
-  "hash": "66c12f7d802a3e9ff375"
+  "hash": "9e5848207f0a7e21fc7e16c0e1dddaa2"
 }

@@ -13,6 +13,7 @@
     const { React, FluxDispatcher } = vendetta.metro.common;
     const { showToast } = vendetta.ui.toasts;
     const { showConfirmationAlert } = vendetta.ui.alerts;
+    try { showToast("Defuse Link plugin v82 loaded"); } catch (e) {}   // if you do NOT see this toast after restarting Kettu, the OLD plugin is still running (change the hash in manifest.json)
     // only the NEWEST loaded copy of this plugin acts (two installed copies = every answer appeared 2-3 times)
     const G = typeof globalThis !== "undefined" ? globalThis : window;
     const token = {};
@@ -38,7 +39,8 @@
       return null;
     };
     const show = (title, text, channelId) => {
-      if (!String(text == null ? "" : text).replace(/[\u200b\u2060\s]/g, "")) return; // empty reply (e.g. Simon stage already answered) -> show nothing
+      const clean = String(text == null ? "" : text).replace(/[\u200b\u2060\s]/g, "");
+      if (!clean || clean === "silent") return; // empty reply (e.g. Simon stage already answered) -> show nothing
       if (OUTPUT === "message") {
         try {
           const mu = findByProps("sendBotMessage");

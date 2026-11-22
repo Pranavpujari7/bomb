@@ -38,6 +38,7 @@
       return null;
     };
     const show = (title, text, channelId) => {
+      if (!String(text == null ? "" : text).replace(/[\u200b\u2060\s]/g, "")) return; // empty reply (e.g. Simon stage already answered) -> show nothing
       if (OUTPUT === "message") {
         try {
           const mu = findByProps("sendBotMessage");

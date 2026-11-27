@@ -1,7 +1,8 @@
 {
   "name": "Defuse Link",
-  "description": "Sends bomb module pictures and manuals to the local defuser helper bot (127.0.0.1:8765) and shows the answers.",
-  "authors": [{ "name": "Pranavpujari7" }],
+  "description": "Sends module pictures to the local bomb helper bot",
+  "authors": [{ "name": "Defuse Link" }],
   "main": "index.js",
-  "hash": "9e5848207f0a7e21fc7e16c0e1dddaa2"
+  "hash": "v83",
+  "vendetta": { "icon": "ic_link" }
 }

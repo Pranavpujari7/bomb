@@ -13,7 +13,7 @@
     const { React, FluxDispatcher } = vendetta.metro.common;
     const { showToast } = vendetta.ui.toasts;
     const { showConfirmationAlert } = vendetta.ui.alerts;
-    try { showToast("Defuse Link plugin v82 loaded"); } catch (e) {}   // if you do NOT see this toast after restarting Kettu, the OLD plugin is still running (change the hash in manifest.json)
+    try { showToast("Defuse Link plugin v83 loaded"); } catch (e) {}   // if you do NOT see this toast after restarting Kettu, the OLD plugin is still running (change the hash in manifest.json)
     // only the NEWEST loaded copy of this plugin acts (two installed copies = every answer appeared 2-3 times)
     const G = typeof globalThis !== "undefined" ? globalThis : window;
     const token = {};
@@ -67,6 +67,19 @@
       }
       return parts.filter(Boolean).join("\n");
     };
+    // v83: labels of the message's ENABLED buttons ("Cut 3 (Red\u2192C)", "Next Panel")
+    const buttonsOf = (m) => {
+      const out = [];
+      const walk = (c, depth) => {
+        if (!c || depth > 8) return;
+        if (Array.isArray(c)) { for (const x of c) walk(x, depth + 1); return; }
+        if (typeof c.label === "string" && c.label && !c.disabled) out.push(c.label);
+        walk(c.components, depth + 1);
+        walk(c.accessory, depth + 1);
+      };
+      try { walk(m && m.components, 0); } catch (e) {}
+      return out;
+    };
     const post = async (path, body) => {
       let r;
       try {
@@ -112,7 +125,7 @@
           if (!(Number(m.flags || 0) & 64) && !(m.author && m.author.bot)) continue;
           const url = imageOf(m);
           if (!url) continue;
-          items.push({ id: m.id, text: textOf(m), url });
+          items.push({ id: m.id, text: textOf(m), url, buttons: buttonsOf(m) });
         }
         const j = await post("/solveall", { user: me.id, items });
         if (j.copy && j.copied === false) copyText(j.copy);
@@ -136,20 +149,22 @@
       }
       return out;
     };
-    const solve = async (url, channelId, text) => {
-      if (busy) return;
-      busy = true;
+    let queue = Promise.resolve();   // v83: pictures wait their turn (before, one arriving while busy was lost)
+    const solveNow = async (url, channelId, text, buttons) => {
+      if (!alive()) return;
       showToast("Solving...");
       try {
         const me = findByStoreName("UserStore").getCurrentUser();
-        const j = await post("/solve", { url, text: text || "", user: me.id });
+        const j = await post("/solve", { url, text: text || "", buttons: buttons || [], user: me.id });
         if (j.copy && j.copied === false) copyText(j.copy);
         show("Answer", j.text, channelId);
       } catch (e) {
         fail(e);
-      } finally {
-        busy = false;
       }
+    };
+    const solve = (url, channelId, text, buttons) => {
+      queue = queue.then(() => solveNow(url, channelId, text, buttons)).catch(() => {});
+      return queue;
     };
     state.solve = solve;
     if (AUTO) {
@@ -171,7 +186,7 @@
         const key = m.id + "|" + String(url).split("?")[0];
         if (seen.has(key)) return;
         seen.add(key);
-        solve(url, chId, textOf(m));
+        solve(url, chId, textOf(m), buttonsOf(m));
       };
       FluxDispatcher.subscribe("MESSAGE_CREATE", onMsg);
       FluxDispatcher.subscribe("MESSAGE_UPDATE", onMsg);
@@ -207,7 +222,7 @@
                     onPress: () => { LazyActionSheet.hideActionSheet(); fn(); },
                   });
                 const mine = [];
-                if (url) mine.push(row("solve", "Solve module", () => solve(url, chId, txt)));
+                if (url) mine.push(row("solve", "Solve module", () => solve(url, chId, txt, buttonsOf(message))));
                 mine.push(row("manual", "Save manual", () => saveManual(txt, urls, false, chId)));
                 mine.push(row("all", "Solve all", () => solveAll(message, chId)));
                 rows.unshift(...mine);

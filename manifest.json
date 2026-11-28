@@ -1,8 +1,14 @@
 {
   "name": "Defuse Link",
-  "description": "Sends module pictures to the local bomb helper bot",
-  "authors": [{ "name": "Defuse Link" }],
+  "description": "Solve module / Save manual / Solve all + Knobs and Breaker alerts",
+  "authors": [
+    {
+      "name": "helper"
+    }
+  ],
   "main": "index.js",
-  "hash": "v83",
-  "vendetta": { "icon": "ic_link" }
+  "hash": "66579917ad7b0b4f6f25d4d5204cd21a47cd69920e53148a75a86d526447c45e",
+  "vendetta": {
+    "icon": "ic_link"
+  }
 }

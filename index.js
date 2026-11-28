@@ -13,7 +13,7 @@
     const { React, FluxDispatcher } = vendetta.metro.common;
     const { showToast } = vendetta.ui.toasts;
     const { showConfirmationAlert } = vendetta.ui.alerts;
-    try { showToast("Defuse Link plugin v83 loaded"); } catch (e) {}   // if you do NOT see this toast after restarting Kettu, the OLD plugin is still running (change the hash in manifest.json)
+    try { showToast("Defuse Link plugin v84 loaded"); } catch (e) {}   // if you do NOT see this toast after restarting Kettu, the OLD plugin is still running (change the hash in manifest.json)
     // only the NEWEST loaded copy of this plugin acts (two installed copies = every answer appeared 2-3 times)
     const G = typeof globalThis !== "undefined" ? globalThis : window;
     const token = {};
@@ -24,6 +24,23 @@
     G.__defuseSeen = G.__defuseSeen || new Set();
     const seen = G.__defuseSeen;
     let busy = false;
+    // v84: the "Bomb" message is built from components (no embed / attachment): read its text and gallery pictures too.
+    // "accessory" (the small bomb icon) is never taken as a picture.
+    const scan = (m) => {
+      const texts = [], urls = [];
+      const walk = (v, depth, icon) => {
+        if (!v || typeof v !== "object" || depth > 10) return;
+        if (!icon) {
+          const u = [v.url, v.proxy_url, v.proxyURL, v.proxyUrl].find((x) => typeof x === "string" &&
+            /^https?:.*discord.*\.(png|jpe?g|webp)(\?|$)/i.test(x) && !/\/(avatars|emojis)\//.test(x));
+          if (u) { if (urls.indexOf(u) < 0) urls.push(u); }
+        }
+        if (typeof v.content === "string" && v.content) texts.push(v.content);
+        for (const k in v) walk(v[k], depth + 1, icon || k === "accessory" || k === "thumbnail");
+      };
+      try { walk(m && m.components, 0, false); } catch (e) {}
+      return { texts, urls };
+    };
     const imageOf = (m) => {
       if (!m) return null;
       for (const a of m.attachments || []) {
@@ -36,7 +53,7 @@
           if (p && (p.url || p.proxyURL || p.proxy_url)) return p.proxyURL || p.proxy_url || p.url;
         }
       }
-      return null;
+      return scan(m).urls[0] || null;
     };
     const show = (title, text, channelId) => {
       const clean = String(text == null ? "" : text).replace(/[\u200b\u2060\s]/g, "");
@@ -65,6 +82,7 @@
         parts.push(e.rawTitle || e.title || "", e.rawDescription || e.description || "", (e.footer && (e.footer.text || e.footer.rawText)) || "");
         for (const f of e.fields || []) parts.push((f.rawName || f.name || "") + "\n" + (f.rawValue || f.value || ""));
       }
+      parts.push(...scan(m).texts);
       return parts.filter(Boolean).join("\n");
     };
     // v83: labels of the message's ENABLED buttons ("Cut 3 (Red\u2192C)", "Next Panel")
@@ -108,6 +126,7 @@
       }
     };
     state.saveManual = saveManual;
+    const isBomb = (m) => /bomb is live/i.test(textOf(m).replace(/[*_`]/g, ""));
     const solveAll = async (startMessage, channelId) => {
       if (busy) return;
       busy = true;
@@ -118,15 +137,18 @@
         const col = findByStoreName("MessageStore").getMessages(ch);
         const arr = (col && (col.toArray ? col.toArray() : col._array)) || [];
         let from = arr.findIndex((x) => x.id === startMessage.id);
-        const list = from >= 0 ? arr.slice(from) : arr.slice(-30);
+        // v84: pressed on the Bomb message = solve every module in ITS picture; otherwise Bomb messages are left out (numbering)
+        const onBomb = isBomb(startMessage);
+        const list = onBomb ? [startMessage] : from >= 0 ? arr.slice(from) : arr.slice(-30);
         const items = [];
         for (const m of list) {
           if (String(m.content || "").charCodeAt(0) === 0x200b) continue;
           if (!(Number(m.flags || 0) & 64) && !(m.author && m.author.bot)) continue;
           const url = imageOf(m);
-          if (!url) continue;
+          if (!url || (!onBomb && isBomb(m))) continue;
           items.push({ id: m.id, text: textOf(m), url, buttons: buttonsOf(m) });
         }
+        if (onBomb && !items.length) { showToast("No bomb picture found in this message"); return; }
         const j = await post("/solveall", { user: me.id, items });
         if (j.copy && j.copied === false) copyText(j.copy);
         show("Answers", j.text, ch);
@@ -147,6 +169,7 @@
       for (const e of (m && m.embeds) || []) {
         for (const p of [e.image, e.thumbnail]) if (p) add(p.proxyURL || p.proxy_url || p.url);
       }
+      scan(m).urls.forEach(add);
       return out;
     };
     let queue = Promise.resolve();   // v83: pictures wait their turn (before, one arriving while busy was lost)
@@ -195,6 +218,32 @@
         FluxDispatcher.unsubscribe("MESSAGE_UPDATE", onMsg);
       });
     }
+    // v84: Bomb Alerts - the live Bomb message syncs the Knobs / Breaker alerts in the bot; boom / defused stops them
+    const watched = new Set();
+    const watch = async (m) => {
+      try {
+        if (!alive() || !m || !m.id || !m.author || !m.author.bot) return;
+        const ts = Math.floor(Number(m.id) / 4194304) + 1420070400000;
+        if (Date.now() - ts > 15 * 60000) return;
+        const text = textOf(m).replace(/[*_`]/g, "").slice(0, 3000);
+        const live = /bomb is live/i.test(text);
+        const end = !live && /bomb (has )?detonated|bomb (has been |was )?defused/i.test(text);
+        const urls = imagesOf(m).slice(0, 4);
+        const key = m.id + (end ? ":end" : "");
+        if (!(end || (live && urls.length)) || watched.has(key)) return;
+        watched.add(key);
+        try {
+          const j = await post("/bombwatch", { user: findByStoreName("UserStore").getCurrentUser().id, text, urls, ts, end });
+          if (j.retry) watched.delete(key);
+          if (j.text) showToast(j.text);
+        } catch (e) { watched.delete(key); fail(e); }
+      } catch (e) {}
+    };
+    const watchOne = (ev) => { if (ev && !ev.optimistic) watch(ev.message); };
+    const watchMany = (ev) => ((ev && ev.messages) || []).forEach(watch);
+    const subs = [["MESSAGE_CREATE", watchOne], ["MESSAGE_UPDATE", watchOne], ["LOAD_MESSAGES_SUCCESS", watchMany]];
+    subs.forEach(([n, f]) => FluxDispatcher.subscribe(n, f));
+    state.unpatches.push(() => subs.forEach(([n, f]) => FluxDispatcher.unsubscribe(n, f)));
     if (LONG_PRESS) {
       try {
         const LazyActionSheet = findByProps("openLazy", "hideActionSheet");
